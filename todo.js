@@ -1,93 +1,87 @@
-// Initialize tasks array from local storage
-let tasks = JSON.parse(localStorage.getItem('tasks')) || [];
+let tasks = [];
 
-// DOM Elements
 const taskInput = document.getElementById('taskInput');
 const addTaskBtn = document.getElementById('addTaskBtn');
 const taskList = document.getElementById('taskList');
+const taskCount = document.getElementById('taskCount');
+const clearCompletedBtn = document.getElementById('clearCompletedBtn');
+const emptyState = document.getElementById('emptyState');
+const dateDisplay = document.getElementById('dateDisplay');
 
-// Load tasks when page loads
 document.addEventListener('DOMContentLoaded', () => {
+    loadTasks();
     renderTasks();
+    updateDate();
     taskInput.focus();
 });
 
-// Add task on button click
 addTaskBtn.addEventListener('click', addTask);
 
-// Add task on Enter key press
 taskInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        addTask();
-    }
+    if (e.key === 'Enter') addTask();
 });
 
-// Add task function
+clearCompletedBtn.addEventListener('click', clearCompleted);
+
+function updateDate() {
+    const options = { weekday: 'long', month: 'long', day: 'numeric' };
+    dateDisplay.textContent = new Date().toLocaleDateString('en-US', options);
+}
+
 function addTask() {
-    const taskText = taskInput.value.trim();
-    
-    if (taskText === '') {
-        alert('Please enter a task!');
+    const text = taskInput.value.trim();
+    if (!text) {
+        taskInput.classList.add('shake');
+        setTimeout(() => taskInput.classList.remove('shake'), 400);
         return;
     }
-    
-    // Create task object
-    const task = {
+
+    tasks.push({
         id: Date.now(),
-        text: taskText,
-        completed: false,
-        createdAt: new Date().toLocaleString()
-    };
-    
-    // Add to tasks array
-    tasks.push(task);
-    
-    // Save to local storage
-    saveTasks();
-    
-    // Render tasks
-    renderTasks();
-    
-    // Clear input
+        text,
+        completed: false
+    });
+
     taskInput.value = '';
+    saveTasks();
+    renderTasks();
     taskInput.focus();
 }
 
-// Render all tasks
 function renderTasks() {
     taskList.innerHTML = '';
-    
-    if (tasks.length === 0) {
-        taskList.innerHTML = '<li style="text-align: center; color: #999; padding: 20px;">No tasks yet. Add one to get started!</li>';
-        return;
-    }
-    
-    tasks.forEach((task) => {
+
+    const activeCount = tasks.filter(t => !t.completed).length;
+    const completedCount = tasks.filter(t => t.completed).length;
+
+    taskCount.textContent = `${activeCount} item${activeCount !== 1 ? 's' : ''} left`;
+    clearCompletedBtn.style.display = completedCount > 0 ? 'block' : 'none';
+    emptyState.style.display = tasks.length === 0 ? 'block' : 'none';
+
+    tasks.forEach((task, index) => {
         const li = document.createElement('li');
-        li.className = `task-item ${task.completed ? 'completed' : ''}`;
+        li.className = `task-item${task.completed ? ' completed' : ''}`;
+        li.dataset.id = task.id;
+        li.style.animationDelay = `${index * 0.05}s`;
+
         li.innerHTML = `
-            <div class="task-content">
-                <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} />
-                <span class="task-text">${escapeHtml(task.text)}</span>
-            </div>
-            <button class="delete-btn">Delete</button>
+            <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''}>
+            <span class="task-text">${escapeHtml(task.text)}</span>
+            <button class="delete-btn" title="Delete task">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                </svg>
+            </button>
         `;
-        
-        // Toggle completion
-        li.querySelector('.task-checkbox').addEventListener('change', () => {
-            toggleTask(task.id);
-        });
-        
-        // Delete task
-        li.querySelector('.delete-btn').addEventListener('click', () => {
-            deleteTask(task.id);
-        });
-        
+
+        li.querySelector('.task-checkbox').addEventListener('change', () => toggleTask(task.id));
+        li.querySelector('.delete-btn').addEventListener('click', () => deleteTask(task.id));
+
         taskList.appendChild(li);
     });
 }
 
-// Toggle task completion
 function toggleTask(id) {
     const task = tasks.find(t => t.id === id);
     if (task) {
@@ -97,21 +91,40 @@ function toggleTask(id) {
     }
 }
 
-// Delete task
 function deleteTask(id) {
-    if (confirm('Are you sure you want to delete this task?')) {
-        tasks = tasks.filter(t => t.id !== id);
-        saveTasks();
-        renderTasks();
+    const li = taskList.querySelector(`[data-id="${id}"]`);
+    if (li) {
+        li.classList.add('removing');
+        setTimeout(() => {
+            tasks = tasks.filter(t => t.id !== id);
+            saveTasks();
+            renderTasks();
+        }, 220);
     }
 }
 
-// Save tasks to local storage
-function saveTasks() {
-    localStorage.setItem('tasks', JSON.stringify(tasks));
+function clearCompleted() {
+    tasks = tasks.filter(t => !t.completed);
+    saveTasks();
+    renderTasks();
+    taskInput.focus();
 }
 
-// Escape HTML to prevent XSS
+function saveTasks() {
+    localStorage.setItem('todo_tasks', JSON.stringify(tasks));
+}
+
+function loadTasks() {
+    const saved = localStorage.getItem('todo_tasks');
+    if (saved) {
+        try {
+            tasks = JSON.parse(saved);
+        } catch {
+            tasks = [];
+        }
+    }
+}
+
 function escapeHtml(text) {
     const map = {
         '&': '&amp;',
